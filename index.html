@@ -1,0 +1,63 @@
+<script>
+    let model;
+    let labels = [];
+
+    // Cargar el modelo y las etiquetas
+    async function loadModel() {
+        try {
+            // Cargar el modelo
+            model = await tf.loadLayersModel('model/model.json');
+            console.log("Modelo cargado correctamente");
+
+            // Cargar las etiquetas desde metadata.json
+            const metadata = await fetch('model/metadata.json').then((res) => res.json());
+            labels = metadata.labels;
+            console.log("Etiquetas cargadas:", labels);
+        } catch (error) {
+            console.error("Error al cargar el modelo o etiquetas:", error);
+            document.getElementById("result").textContent = "Error al cargar el modelo o etiquetas.";
+        }
+    }
+
+    // Predecir la categoría de la imagen cargada
+    async function predictImage(imageElement) {
+        try {
+            // Crear un canvas para procesar la imagen
+            const canvas = document.createElement("canvas");
+            canvas.width = 224;
+            canvas.height = 224;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(imageElement, 0, 0, 224, 224); // Redimensionar a 224x224
+
+            // Procesar la imagen
+            const imageData = ctx.getImageData(0, 0, 224, 224);
+            const input = tf.browser.fromPixels(imageData).toFloat().div(255.0).expandDims(0);
+
+            // Realizar la predicción
+            const predictions = await model.predict(input).array();
+            console.log("Predicciones:", predictions);
+
+            // Mostrar la categoría con mayor probabilidad
+            const maxProb = Math.max(...predictions[0]);
+            const maxIndex = predictions[0].indexOf(maxProb);
+            const predictedLabel = labels[maxIndex];
+            document.getElementById("result").textContent = `${predictedLabel} (${(maxProb * 100).toFixed(2)}%)`;
+        } catch (error) {
+            console.error("Error durante la predicción:", error);
+            document.getElementById("result").textContent = "Error al procesar la imagen.";
+        }
+    }
+
+    // Manejar el evento de carga de imágenes
+    document.getElementById("imageInput").addEventListener("change", (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            const img = new Image();
+            img.onload = () => predictImage(img);
+            img.src = URL.createObjectURL(file);
+        }
+    });
+
+    // Cargar el modelo al inicio
+    loadModel();
+</script>
